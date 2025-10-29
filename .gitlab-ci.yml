@@ -1,0 +1,174 @@
+stages:
+  - build
+  - test
+  - integration-test
+  - deploy
+  - notify
+
+variables:
+  FLUTTER_VERSION: "3.16.0"
+  ANDROID_EMULATOR_NAME: "test_device"
+  SLACK_WEBHOOK_URL: ${CI_SLACK_WEBHOOK}  # Set in GitLab CI variables
+
+# Templates
+.flutter_docker:
+  image: flutter-ci:latest
+  before_script:
+    - flutter pub get
+
+.android_emulator:
+  tags:
+    - android-emulator
+  before_script:
+    - $HOME/start_emulator.sh
+    - flutter pub get
+  after_script:
+    - adb emu kill || true
+
+# Backend API Tests
+backend-test:
+  stage: test
+  image: node:18
+  script:
+    - cd backend
+    - npm install
+    - npm test
+  coverage: '/Lines\s*:\s*(\d+\.\d+)%/'
+
+# Flutter Static Analysis & Unit Tests
+flutter-analyze:
+  extends: .flutter_docker
+  stage: test
+  script:
+    - flutter analyze
+    - flutter format --set-exit-if-changed .
+  only:
+    - merge_requests
+    - main
+
+flutter-test:
+  extends: .flutter_docker
+  stage: test
+  script:
+    - flutter test --coverage
+    - lcov --summary coverage/lcov.info
+  coverage: '/Total Coverage: \d+\.\d+%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura.xml
+
+# Build APK
+android-build:
+  extends: .flutter_docker
+  stage: build
+  script:
+    - flutter build apk --release --split-per-abi
+    - flutter build appbundle --release
+  artifacts:
+    paths:
+      - build/app/outputs/flutter-apk/*.apk
+      - build/app/outputs/bundle/release/*.aab
+    expire_in: 1 week
+  only:
+    - main
+    - tags
+
+# Integration Tests with Android Emulator
+android-integration-test:
+  extends: .android_emulator
+  stage: integration-test
+  script:
+    - flutter drive \
+        --driver=test_driver/integration_test.dart \
+        --target=integration_test/app_test.dart \
+        --flavor=staging
+  artifacts:
+    when: always
+    paths:
+      - screenshots/
+    expire_in: 1 week
+  only:
+    - merge_requests
+    - main
+
+# iOS Build (Mac Mini Runner)
+ios-build:
+  stage: build
+  tags:
+    - ios
+    - macos
+  script:
+    - flutter pub get
+    - flutter build ios --release --no-codesign
+    - cd ios && fastlane build
+  artifacts:
+    paths:
+      - build/ios/iphoneos/*.app
+      - build/ios/archive/*.xcarchive
+  only:
+    - main
+    - tags
+
+# Deploy to Play Store
+deploy-android:
+  extends: .flutter_docker
+  stage: deploy
+  dependencies:
+    - android-build
+  script:
+    - echo $PLAY_STORE_JSON_KEY | base64 -d > play-store-key.json
+    - cd android && fastlane deploy
+  environment:
+    name: production-android
+    url: https://play.google.com/store/apps/details?id=com.yourapp
+  only:
+    - tags
+
+# Notifications
+notify-success:
+  stage: notify
+  image: alpine:latest
+  dependencies: []
+  script:
+    - apk add --no-cache curl
+    - |
+      curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"attachments\": [{
+            \"color\": \"good\",
+            \"title\": \":rocket: Deployment Successful!\",
+            \"text\": \"Version $CI_COMMIT_TAG has been deployed\",
+            \"fields\": [
+              {\"title\": \"Environment\", \"value\": \"Production\", \"short\": true},
+              {\"title\": \"Version\", \"value\": \"$CI_COMMIT_TAG\", \"short\": true}
+            ]
+          }]
+        }" \
+        $SLACK_WEBHOOK_URL
+  when: on_success
+  only:
+    - tags
+
+notify-failure:
+  stage: notify
+  image: alpine:latest
+  dependencies: []
+  script:
+    - apk add --no-cache curl
+    - |
+      curl -X POST -H 'Content-type: application/json' \
+        --data "{
+          \"attachments\": [{
+            \"color\": \"danger\",
+            \"title\": \":warning: Pipeline Failed\",
+            \"text\": \"Pipeline failed for commit $CI_COMMIT_SHORT_SHA\",
+            \"fields\": [
+              {\"title\": \"Branch\", \"value\": \"$CI_COMMIT_REF_NAME\", \"short\": true},
+              {\"title\": \"Author\", \"value\": \"$GITLAB_USER_NAME\", \"short\": true}
+            ]
+          }]
+        }" \
+        $SLACK_WEBHOOK_URL
+  when: on_failure

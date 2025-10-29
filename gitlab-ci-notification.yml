@@ -1,0 +1,21 @@
+# Include this in your project's .gitlab-ci.yml
+.notify_slack: &notify_slack
+  - |
+    if [ "$CI_JOB_STATUS" == "success" ]; then
+      COLOR="good"
+      EMOJI=":white_check_mark:"
+    else
+      COLOR="danger"
+      EMOJI=":x:"
+    fi
+    curl -X POST -H 'Content-type: application/json' \
+      --data "{
+        \"attachments\": [{
+          \"color\": \"$COLOR\",
+          \"title\": \"$EMOJI Pipeline $CI_PIPELINE_ID - $CI_JOB_STATUS\",
+          \"text\": \"Project: $CI_PROJECT_NAME\nBranch: $CI_COMMIT_REF_NAME\nCommit: $CI_COMMIT_SHORT_SHA\nAuthor: $GITLAB_USER_NAME\",
+          \"footer\": \"GitLab CI\",
+          \"ts\": $(date +%s)
+        }]
+      }" \
+      $SLACK_WEBHOOK_URL
