@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-common-runner-config: &common-runner-config
   image: gitlab/gitlab-runner:v18.0.0
   restart: always
@@ -20,20 +18,22 @@ services:
     container_name: gitlab
     restart: unless-stopped
     hostname: 'gitlab.local'
-    mem_limit: 8g
-    memswap_limit: 8g
-    cpus: '4'
+    mem_limit: 16g
+    memswap_limit: 16g
+    cpus: '6'
     shm_size: '2g'
+    env_file:
+      - .env
     environment:
       GITLAB_OMNIBUS_CONFIG: |
         external_url ENV['GITLAB_EXTERNAL_URL'] || 'http://gitlab.local'
-        gitlab_rails['gitlab_shell_ssh_port'] = 2222
-        gitlab_rails['smtp_enable'] = true
         gitlab_rails['smtp_address'] = ENV['SMTP_HOST']
         gitlab_rails['smtp_port'] = ENV['SMTP_PORT']
         gitlab_rails['smtp_user_name'] = ENV['SMTP_USER']
-        gitlab_rails['smtp_password'] = ENV['SMTP_PASS']
-        gitlab_rails['smtp_domain'] = ENV['SMTP_DOMAIN'] 
+        gitlab_rails['smtp_password'] = ENV['SMTP_PASSWORD']
+        gitlab_rails['smtp_domain'] = ENV['SMTP_DOMAIN']
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        gitlab_rails['smtp_enable'] = true
         gitlab_rails['smtp_authentication'] = 'login'
         gitlab_rails['smtp_enable_starttls_auto'] = true
         gitlab_rails['gitlab_email_from'] = ENV['GITLAB_EMAIL_FROM'] || 'gitlab@local'
@@ -99,7 +99,7 @@ services:
       - '/var/run/docker.sock:/var/run/docker.sock'
       - /dev/kvm:/dev/kvm
     group_add:
-      - "kvm"
+      - "104" # from the output of 'getent group kvm'
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
     cap_add: []
@@ -118,9 +118,6 @@ volumes:
 networks:
   cicd-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
     labels:
       project: "cicd-infra"
 
