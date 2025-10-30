@@ -1,0 +1,126 @@
+version: '3.8'
+
+x-common-runner-config: &common-runner-config
+  image: gitlab/gitlab-runner:v18.0.0
+  restart: always
+  tmpfs:
+    - /tmp
+    - /run
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:18.3.5-ce.0
+    container_name: gitlab
+    restart: unless-stopped
+    hostname: 'gitlab.local'
+    mem_limit: 8g
+    memswap_limit: 8g
+    cpus: '4'
+    shm_size: '2g'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url ENV['GITLAB_EXTERNAL_URL'] || 'http://gitlab.local'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        gitlab_rails['smtp_enable'] = true
+        gitlab_rails['smtp_address'] = ENV['SMTP_HOST']
+        gitlab_rails['smtp_port'] = ENV['SMTP_PORT']
+        gitlab_rails['smtp_user_name'] = ENV['SMTP_USER']
+        gitlab_rails['smtp_password'] = ENV['SMTP_PASS']
+        gitlab_rails['smtp_domain'] = ENV['SMTP_DOMAIN'] 
+        gitlab_rails['smtp_authentication'] = 'login'
+        gitlab_rails['smtp_enable_starttls_auto'] = true
+        gitlab_rails['gitlab_email_from'] = ENV['GITLAB_EMAIL_FROM'] || 'gitlab@local'
+        prometheus_monitoring['enable'] = true
+        gitlab_rails['backup_path'] = '/var/opt/gitlab/backups'
+        gitlab_rails['backup_keep_time'] = 604800
+      GITLAB_TIMEZONE: "Asia/Shanghai"
+      GITLAB_EXTERNAL_URL: "${GITLAB_EXTERNAL_URL:-http://gitlab.local}"
+    ports:
+      - '80:80'
+      - '443:443'
+      - '2222:22'
+    volumes:
+      - 'gitlab_config:/etc/gitlab'
+      - 'gitlab_logs:/var/log/gitlab'
+      - 'gitlab_data:/var/opt/gitlab'
+      - 'gitlab_backups:/var/opt/gitlab/backups'
+    networks:
+      - cicd-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/-/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  gitlab-runner-docker:
+    <<: *common-runner-config
+    container_name: gitlab-runner-docker
+    mem_limit: 2g
+    cpus: '3'
+    shm_size: '1g'
+    depends_on:
+      - gitlab                 # 👈 简单可靠
+    volumes:
+      - './runner-config:/etc/gitlab-runner'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    networks:
+      - cicd-network
+    healthcheck:
+      test: ["CMD", "gitlab-runner", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  gitlab-runner-shell:
+    <<: *common-runner-config
+    container_name: gitlab-runner-shell
+    mem_limit: 8g
+    cpus: '5'
+    shm_size: '2g'
+    depends_on:
+      - gitlab                 # 👈 简单可靠
+    network_mode: host
+    volumes:
+      - './runner-shell-config:/etc/gitlab-runner'
+      - '/home/${USER:-user}:/home/${USER:-user}'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - /dev/kvm:/dev/kvm
+    group_add:
+      - "kvm"
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    cap_add: []
+    healthcheck:
+      test: ["CMD", "gitlab-runner", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  gitlab_config:
+  gitlab_logs:
+  gitlab_data:
+  gitlab_backups:
+
+networks:
+  cicd-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    labels:
+      project: "cicd-infra"
+
