@@ -31,7 +31,7 @@ echo "=========================================="
 echo ""
 
 # 2. Run the start script
-./start.sh
+bash ./start.sh
 
 echo ""
 echo "=========================================="
@@ -46,5 +46,5 @@ echo "1. Add '127.0.0.1 gitlab.local' to /etc/hosts if not already done"
 echo "2. Your browser will show a security warning for the self-signed certificate"
 echo "3. You can safely proceed past the warning (it's expected for self-signed certs)"
 echo ""
-echo "To stop services: ./stop.sh"
+echo "To stop services: bash ./stop.sh"
 echo ""

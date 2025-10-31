@@ -2,10 +2,14 @@
 
 source ../.sh-env
 
-# Start GitLab
+# Prepare
 GITLAB_HOME=$WORKFLOW_HOME/ci-cd/gitlab/
+cp -f *.sh $GITLAB_HOME/
+cp -f ./traefik-dynamic.yml       $GITLAB_HOME/
 cp -f ./docker-compose_gitlab.yml $GITLAB_HOME/docker-compose.yml
-cd $GITLAB_HOME && bash start.sh
+
+# Launch Gitlab
+cd $GITLAB_HOME && ./setup-with-ssl.sh
 
 # Wait for GitLab to be ready
 sleep 60
