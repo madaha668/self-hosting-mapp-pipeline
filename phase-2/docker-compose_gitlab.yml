@@ -13,6 +13,53 @@ x-common-runner-config: &common-runner-config
       max-file: "3"
 
 services:
+  traefik:
+    image: traefik:v3.2
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      # Enable Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=cicd-network"
+      # Enable file provider for dynamic config
+      - "--providers.file.filename=/etc/traefik/traefik-dynamic.yml"
+      - "--providers.file.watch=true"
+      # Entry points
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # HTTP to HTTPS redirect
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Enable API and dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      # Enable ping for healthcheck
+      - "--ping=true"
+      # Logging
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/certs:ro
+      - ./traefik-dynamic.yml:/etc/traefik/traefik-dynamic.yml:ro
+    networks:
+      - cicd-network
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   gitlab:
     image: gitlab/gitlab-ce:18.3.5-ce.0
     container_name: gitlab
@@ -26,7 +73,13 @@ services:
       - .env
     environment:
       GITLAB_OMNIBUS_CONFIG: |
-        external_url ENV['GITLAB_EXTERNAL_URL'] || 'http://gitlab.local'
+        external_url 'https://gitlab.local'
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = {
+          "X-Forwarded-Proto" => "https",
+          "X-Forwarded-Ssl" => "on"
+        }
         gitlab_rails['smtp_address'] = ENV['SMTP_HOST']
         gitlab_rails['smtp_port'] = ENV['SMTP_PORT']
         gitlab_rails['smtp_user_name'] = ENV['SMTP_USER']
@@ -41,11 +94,10 @@ services:
         gitlab_rails['backup_path'] = '/var/opt/gitlab/backups'
         gitlab_rails['backup_keep_time'] = 604800
       GITLAB_TIMEZONE: "Asia/Shanghai"
-      GITLAB_EXTERNAL_URL: "${GITLAB_EXTERNAL_URL:-http://gitlab.local}"
     ports:
-      - '80:80'
-      - '443:443'
       - '2222:22'
+    expose:
+      - "80"
     volumes:
       - 'gitlab_config:/etc/gitlab'
       - 'gitlab_logs:/var/log/gitlab'
@@ -53,6 +105,18 @@ services:
       - 'gitlab_backups:/var/opt/gitlab/backups'
     networks:
       - cicd-network
+    labels:
+      - "traefik.enable=true"
+      # HTTP router (will redirect to HTTPS)
+      - "traefik.http.routers.gitlab-http.rule=Host(`gitlab.local`)"
+      - "traefik.http.routers.gitlab-http.entrypoints=web"
+      # HTTPS router
+      - "traefik.http.routers.gitlab-https.rule=Host(`gitlab.local`)"
+      - "traefik.http.routers.gitlab-https.entrypoints=websecure"
+      - "traefik.http.routers.gitlab-https.tls=true"
+      - "traefik.http.routers.gitlab-https.service=gitlab"
+      # Service
+      - "traefik.http.services.gitlab.loadbalancer.server.port=80"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/-/health"]
       interval: 30s
