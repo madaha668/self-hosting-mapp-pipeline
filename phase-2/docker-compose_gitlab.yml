@@ -140,6 +140,7 @@ services:
     volumes:
       - './runner-config:/etc/gitlab-runner'
       - '/var/run/docker.sock:/var/run/docker.sock'
+      - './certs:/certs'
     networks:
       - cicd-network
     healthcheck:
@@ -161,6 +162,7 @@ services:
       - './runner-shell-config:/etc/gitlab-runner'
       - '/home/${USER:-user}:/home/${USER:-user}'
       - '/var/run/docker.sock:/var/run/docker.sock'
+      - './certs:/etc/gitlab-runner/certs'
       - /dev/kvm:/dev/kvm
     group_add:
       - "104" # from the output of 'getent group kvm'
