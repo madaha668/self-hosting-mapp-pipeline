@@ -10,5 +10,18 @@ ENV NO_PROXY=
 
 # Accept Android licenses (persists in the image)
 RUN yes | flutter doctor --android-licenses
+RUN    sdkmanager \
+        "platform-tools" \
+        "platforms;android-33" \
+        "platforms;android-34" \
+        "build-tools;33.0.3" \
+        "build-tools;30.0.3" \
+        "build-tools;34.0.0"
 
-RUN apt-get update && apt-get install -y iputils-ping apt-utils
+RUN git config --global --add safe.directory /sdks/flutter
+
+ARG USER_ID
+ARG GROUP_ID
+RUN chown -R ${USER_ID}:${GROUP_ID} /sdks/flutter
+
+RUN apt-get update && apt-get install -y iputils-ping
