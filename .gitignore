@@ -2,3 +2,4 @@ get-docker.sh
 .env
 .sh-env
 certs/
+bin/
