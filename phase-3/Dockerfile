@@ -4,9 +4,9 @@ ENV FLUTTER_GIT_URL=https://mirrors.tuna.tsinghua.edu.cn/git/flutter.git
 ENV FLUTTER_STORAGE_BASE_URL=https://mirrors.tuna.tsinghua.edu.cn/flutter
 
 # proxy settings - set yours
-ENV HTTP_PROXY=
-ENV HTTPS_PROXY=
-ENV NO_PROXY=
+#ENV HTTP_PROXY=
+#ENV HTTPS_PROXY=
+#ENV NO_PROXY=
 
 # Accept Android licenses (persists in the image)
 RUN yes | flutter doctor --android-licenses

@@ -17,8 +17,8 @@ docker run --dns 8.8.8.8 \
            --group-add ${KVM_GID} \
            --env CI=true \
            -v ${PWD}:/build \
-           -v ${PUB_CACHE_DIR}:/root/.pub-cache  \
-           -v ${GRADLE_CACHE_DIR}:/root/.gradle  \
+           -v ${PUB_CACHE_DIR}:/home/ubuntu/.pub-cache  \
+           -v ${GRADLE_CACHE_DIR}:/home/ubuntu/.gradle  \
            --add-host=host.docker.internal:172.17.0.1 \
            -e ADB_SERVER_SOCKET=tcp:host.docker.internal:5037 \
            --workdir /build --rm -i flutter:${FLUTTER_VERSION} flutter $*

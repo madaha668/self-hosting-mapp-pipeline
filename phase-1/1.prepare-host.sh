@@ -3,9 +3,9 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y curl git wget unzip build-essential cpu-checker
 
 # Install Docker
-#curl -fsSL https://get.docker.com -o get-docker.sh
-#sudo sh get-docker.sh
-#sudo usermod -aG docker $USER
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
 
 # Install Docker Compose v2
 # if you installed docker from docker official site, just run 'sudo apt install -y docker-compose-plugin docker-buildx-plugin'
