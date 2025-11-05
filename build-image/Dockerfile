@@ -6,9 +6,9 @@ ENV FLUTTER_STORAGE_BASE_URL=https://mirrors.tuna.tsinghua.edu.cn/flutter
 #ENV FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
 
 # proxy settings - set it !!!
-ENV HTTP_PROXY=
-ENV HTTPS_PROXY=
-ENV NO_PROXY=
+#ENV HTTP_PROXY=
+#ENV HTTPS_PROXY=
+#ENV NO_PROXY=
 
 # Accept Android licenses (persists in the image)
 RUN yes | flutter doctor --android-licenses

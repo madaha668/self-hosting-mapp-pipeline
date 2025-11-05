@@ -18,28 +18,28 @@ if [[ "$EXECUTOR_TYPE" != "docker" && "$EXECUTOR_TYPE" != "shell" ]]; then
 fi
 
 # common args
-COMMON_ARGS='
+COMMON_ARGS="
     --non-interactive 
-    --url "https://gitlab.local/" 
-    --token "$RUNNER_TOKEN" 
-    --name "${EXECUTOR_TYPE}-runner" 
-'
+    --url 'https://gitlab.local/' 
+    --token $RUNNER_TOKEN 
+    --name ${EXECUTOR_TYPE}-runner"
 
 # runner as docker or shell
 if [ "$EXECUTOR_TYPE" = "docker" ]; then
     COMMON_ARGS+='
-        --executor "docker" 
+        --executor docker 
         --docker-image "alpine:latest" 
         --docker-volumes "/var/run/docker.sock:/var/run/docker.sock" 
     '
     CONTAINER_NAME=gitlab-runner-docker
 else  # shell
     COMMON_ARGS+='
-        --executor "shell"
+        --executor shell
     '
     CONTAINER_NAME=gitlab-runner-docker
 fi
 
 # register it
 echo ${COMMON_ARGS[@]}
+gitlab-runner register ${COMMON_ARGS[@]}
 #docker exec -it $CONTAINER_NAME gitlab-runner register "${COMMON_ARGS[@]}"
