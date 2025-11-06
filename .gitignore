@@ -3,3 +3,4 @@ get-docker.sh
 .sh-env
 certs/
 bin/
+*.log
