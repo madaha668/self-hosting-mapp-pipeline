@@ -1,17 +1,24 @@
 #!/bin/bash
 
-. ${PWD}/flutter.version
+if [ -x ${PWD}/flutter.version ]; then
+	. ${PWD}/flutter.version
+else
+	FLUTTER_VERSION=3.22.0
+fi
 
 #FIXME: set yours !!!
 PUB_CACHE_DIR=${HOME}/ci-cd/pub-cache
 GRADLE_CACHE_DIR=${HOME}/ci-cd/gradle
 
-#run as user instead of root
+#run as the default (first) user in the host instead of root
 export UID_TGT=$(id -u)
 export GID_TGT=$(id -g)
 export KVM_GID=$(getent group kvm | cut -d: -f3)
 
+# NOTE:
+# add the following option to docker run cmdline if running in a physical host
 #          --device /dev/kvm \
+
 docker run --dns 8.8.8.8 \
            --user ${UID_TGT}:${GID_TGT} \
            --group-add ${KVM_GID} \

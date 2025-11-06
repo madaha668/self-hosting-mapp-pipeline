@@ -25,3 +25,5 @@ ARG GROUP_ID
 RUN chown -R ${USER_ID}:${GROUP_ID} /sdks/flutter
 
 RUN apt-get update && apt-get install -y iputils-ping
+
+RUN flutter config --no-analytics
