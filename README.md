@@ -132,9 +132,18 @@ EOF
 
 #### Step 2.2: Add GitLab Hostname to /etc/hosts
 
+**For local access** (on the GitLab host):
 ```bash
 echo "127.0.0.1 gitlab.local" | sudo tee -a /etc/hosts
 ```
+
+**For remote access** (from other machines on your network):
+```bash
+# On remote machines, replace <GITLAB_SERVER_IP> with the actual IP
+echo "<GITLAB_SERVER_IP> gitlab.local" | sudo tee -a /etc/hosts
+```
+
+**Note**: The GitLab container listens on `0.0.0.0:443`, so it's accessible from other machines on your network.
 
 #### Step 2.3: Generate SSL Certificates and Start Services
 
@@ -166,13 +175,41 @@ docker compose -f docker-compose_gitlab.yml logs -f
 bash stop.sh
 ```
 
-#### Step 2.4: Access GitLab Web Interface
+#### Step 2.4: Install Self-Signed SSL Certificate (Optional)
+
+To avoid browser security warnings, install the self-signed certificate to your system's trust store.
+
+**On Debian/Ubuntu**:
+```bash
+# Copy certificate to system trust store
+sudo cp phase-2/certs/gitlab.local.crt /usr/local/share/ca-certificates/gitlab.local.crt
+
+# Update CA certificates
+sudo update-ca-certificates
+
+# Verify installation
+sudo update-ca-certificates --verbose | grep gitlab.local
+```
+
+**On the GitLab host** (to avoid HTTPS warnings for curl commands):
+```bash
+sudo cp phase-2/certs/gitlab.local.crt /usr/local/share/ca-certificates/
+sudo update-ca-certificates
+```
+
+**For browsers on remote machines**:
+1. Copy `phase-2/certs/gitlab.local.crt` to the remote machine
+2. Import it into your browser's certificate manager:
+   - **Firefox**: Preferences → Privacy & Security → Certificates → View Certificates → Authorities → Import
+   - **Chrome**: Settings → Privacy and security → Security → Manage certificates → Authorities → Import
+
+#### Step 2.5: Access GitLab Web Interface
 
 Open your browser and navigate to: **https://gitlab.local**
 
-**Note**: Your browser will show a security warning about the self-signed certificate. Click "Advanced" and proceed to the site.
+**Note**: If you didn't install the SSL certificate, your browser will show a security warning. Click "Advanced" and proceed to the site.
 
-#### Step 2.5: Set Root Password
+#### Step 2.6: Set Root Password
 
 Wait for GitLab to fully initialize (this may take 3-5 minutes). Then set the root password:
 
@@ -181,7 +218,7 @@ Wait for GitLab to fully initialize (this may take 3-5 minutes). Then set the ro
 bash 3.set-root-pwd.sh "YourSecurePassword123!"
 ```
 
-#### Step 2.6: Create Additional GitLab Users (Optional)
+#### Step 2.7: Create Additional GitLab Users (Optional)
 
 ```bash
 # Interactive mode (recommended - password is hidden)
@@ -194,26 +231,80 @@ bash 5.create-gitlab-user.sh -u developer -e dev@example.com -a
 bash 5.create-gitlab-user.sh -u admin -e admin@example.com -a --skip-confirmation
 ```
 
-### Phase 3: GitLab Runner Registration
+### Phase 3: GitLab Runner Installation (Non-Containerized)
 
-Although runners are already started via Docker Compose, you may need to register additional runners or reconfigure existing ones.
+Install and configure GitLab Runner as a system service. This is the **recommended approach** for production use, as it provides better performance and easier access to system resources like KVM for Android emulator.
 
-#### Step 3.1: Understand Runner Types
+**Note**: While the Docker Compose setup includes containerized runners, the primary runner used in this setup is a non-containerized GitLab Runner installed as a system service under the `gitlab-runner` user.
 
-The setup includes two runners:
+#### Step 3.1: Install GitLab Runner Binary
 
-1. **gitlab-runner-docker** (Docker executor)
-   - Runs jobs in isolated Docker containers
-   - Best for: Build jobs, unit tests, static analysis
-   - Resource limits: 2GB RAM, 3 CPUs
+```bash
+cd ../phase-3
 
-2. **gitlab-runner-shell** (Shell executor)
-   - Runs jobs directly on the host
-   - Has KVM access for Android emulator
-   - Best for: Integration tests, emulator-based tests
-   - Resource limits: 8GB RAM, 5 CPUs
+# Download and install GitLab Runner
+curl -L --output /tmp/gitlab-runner "https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64"
 
-#### Step 3.2: Get Runner Authentication Token
+# Install to system
+sudo mv /tmp/gitlab-runner /usr/local/bin/gitlab-runner
+sudo chmod +x /usr/local/bin/gitlab-runner
+
+# Verify installation
+gitlab-runner --version
+```
+
+#### Step 3.2: Create GitLab Runner User and Setup Directories
+
+```bash
+# Create gitlab-runner user if not exists
+sudo useradd --system --shell /bin/bash --home /home/gitlab-runner --create-home gitlab-runner
+
+# Add gitlab-runner user to necessary groups
+sudo usermod -aG docker gitlab-runner
+sudo usermod -aG kvm gitlab-runner
+sudo usermod -aG libvirt gitlab-runner
+
+# Create working directories
+sudo mkdir -p /home/gitlab-runner/ci-cd/working/{builds,cache}
+sudo mkdir -p /home/gitlab-runner/.gitlab-runner
+
+# Set ownership
+sudo chown -R gitlab-runner:gitlab-runner /home/gitlab-runner
+
+# Fix .bash_logout to prevent errors
+# Remove the "clear" command that causes issues in non-interactive shells
+sudo sed -i '/^clear/d' /home/gitlab-runner/.bash_logout 2>/dev/null || true
+```
+
+**Important**: The `.bash_logout` cleanup prevents errors when GitLab Runner executes jobs in non-interactive shell mode.
+
+#### Step 3.3: Install GitLab Runner as a Service
+
+```bash
+# Install and start the service
+bash 1.install-gitlab-runner-svc.sh
+
+# Verify service status
+sudo systemctl status gitlab-runner
+
+# Enable service to start on boot
+sudo systemctl enable gitlab-runner
+```
+
+This script installs GitLab Runner as a systemd service that:
+- Runs as the `gitlab-runner` user
+- Uses config file: `/home/gitlab-runner/.gitlab-runner/config.toml`
+- Uses working directory: `/home/gitlab-runner/ci-cd/working`
+
+#### Step 3.4: Understand Runner Configuration
+
+The GitLab Runner will use the **shell executor**, which:
+- Runs jobs directly on the host (not in containers)
+- Has full access to system resources (Docker, KVM, Android SDK)
+- Best for: All job types including builds, tests, and integration tests with Android emulator
+- More performant than Docker executor for heavy workloads
+
+#### Step 3.5: Get Runner Authentication Token
 
 You need a runner authentication token from GitLab to register runners.
 
@@ -221,50 +312,111 @@ You need a runner authentication token from GitLab to register runners.
 1. Log in to GitLab as root/admin
 2. Go to **Admin Area** → **CI/CD** → **Runners**
 3. Click **New instance runner**
-4. Configure the runner and click **Create runner**
-5. Copy the authentication token (starts with `glrt-`)
+4. Select **Linux** as the platform
+5. Add tags if desired (e.g., `shell`, `linux`, `android`)
+6. Check "Run untagged jobs" if you want this runner to pick up all jobs
+7. Click **Create runner**
+8. Copy the authentication token (starts with `glrt-`)
 
 **Option B**: Via Script (GitLab API)
 
-```bash
-cd ../phase-3
+First, create a personal access token in GitLab:
+1. Go to **User Settings** → **Access Tokens**
+2. Create token with scopes: `api`, `create_runner`
+3. Copy the token (starts with `glpat-`)
 
-# This script uses GitLab API to create and retrieve tokens
-bash 2.get-gitlab-token.sh
+Then run:
+```bash
+# Set environment variables
+export GITLAB_URL=https://gitlab.local
+export GITLAB_TOKEN=glpat-your-token-here
+
+# Create runner and get authentication token
+bash 3.create-gitlab-instance-runner.sh \
+  -d "shell-runner-main" \
+  -g "shell,linux,android" \
+  -o /tmp/runner_token.txt
+
+# The authentication token will be saved to /tmp/runner_token.txt
+cat /tmp/runner_token.txt
 ```
 
-#### Step 3.3: Register Runners
+#### Step 3.6: Register the GitLab Runner
 
-The Docker Compose setup already includes runners, but if you need to register them manually:
+Register the runner with GitLab using the authentication token:
 
 ```bash
-# Register Docker executor runner
-bash 5.register-gitlab-runner.sh \
-  -t 'glrt-your-token-here' \
-  -u https://gitlab.local \
-  -n 'docker-runner-1' \
-  -e docker \
-  -i 'alpine:latest'
+# Replace with your actual token from previous step
+export RUNNER_TOKEN="glrt-your-token-here"
 
-# Register Shell executor runner
-bash 5.register-gitlab-runner.sh \
-  -t 'glrt-your-token-here' \
-  -u https://gitlab.local \
-  -n 'shell-runner-1' \
-  -e shell
+# Register shell executor runner
+sudo gitlab-runner register \
+  --non-interactive \
+  --url "https://gitlab.local" \
+  --token "$RUNNER_TOKEN" \
+  --executor "shell" \
+  --description "shell-runner-main" \
+  --tag-list "shell,linux,android" \
+  --run-untagged="true" \
+  --builds-dir "/home/gitlab-runner/ci-cd/working/builds" \
+  --cache-dir "/home/gitlab-runner/ci-cd/working/cache"
+
+# Restart the runner service
+sudo systemctl restart gitlab-runner
+
+# View runner status
+sudo gitlab-runner list
 ```
 
-#### Step 3.4: Verify Runner Status
+**Alternative**: Use the provided script for more options:
 
-Check that runners are connected:
+```bash
+# Interactive registration
+bash 5.register-gitlab-runner.sh
 
+# Or with command-line arguments
+bash 5.register-gitlab-runner.sh \
+  -t "$RUNNER_TOKEN" \
+  -u https://gitlab.local \
+  -n 'shell-runner-main' \
+  -e shell \
+  --deploy-method local
+```
+
+#### Step 3.7: Verify Runner Status
+
+Check that the runner is connected and active:
+
+**Via GitLab UI**:
 1. Go to **Admin Area** → **CI/CD** → **Runners**
-2. You should see your runners listed with a green status indicator
-3. Or via CLI:
+2. You should see your runner listed with a green status indicator
+3. Click on the runner to view details and recent jobs
+
+**Via CLI**:
+```bash
+# List registered runners
+sudo gitlab-runner list
+
+# Check service status
+sudo systemctl status gitlab-runner
+
+# View runner logs
+sudo journalctl -u gitlab-runner -f
+```
+
+#### Step 3.8: Configure Runner Concurrency (Optional)
+
+Adjust the number of concurrent jobs the runner can handle:
 
 ```bash
-docker exec gitlab-runner-docker gitlab-runner list
-docker exec gitlab-runner-shell gitlab-runner list
+# Edit the config file
+sudo nano /home/gitlab-runner/.gitlab-runner/config.toml
+
+# Update the concurrent value (default is 1)
+# concurrent = 4  # Allow 4 jobs to run simultaneously
+
+# Restart the service
+sudo systemctl restart gitlab-runner
 ```
 
 ### Phase 4: GitLab CI/CD Pipeline Integration
@@ -379,8 +531,9 @@ git push origin main
 Main Docker Compose configuration with:
 - Traefik reverse proxy (ports 80, 443, 8080)
 - GitLab CE server (16GB RAM, 6 CPUs)
-- GitLab Docker runner (2GB RAM, 3 CPUs)
-- GitLab Shell runner (8GB RAM, 5 CPUs, KVM access)
+- Optional containerized runners (for reference; the main runner is non-containerized)
+
+**Note**: The production setup uses a non-containerized GitLab Runner installed via phase-3, not the containerized runners in docker-compose.
 
 ### phase-2/traefik-dynamic.yml
 
@@ -404,18 +557,35 @@ Flutter Docker image definition based on `ghcr.io/cirruslabs/flutter:3.22.0`.
 
 ### Runner Not Connecting
 
-**Problem**: Runners show as offline in GitLab UI
+**Problem**: Runner shows as offline in GitLab UI
 
 **Solutions**:
-1. Check runner logs:
+1. Check runner service status:
    ```bash
-   docker logs gitlab-runner-docker
-   docker logs gitlab-runner-shell
+   sudo systemctl status gitlab-runner
+   sudo journalctl -u gitlab-runner -n 50
    ```
-2. Verify runner token is correct in registration
-3. Check network connectivity: `docker exec gitlab-runner-docker ping gitlab.local`
-4. Ensure GitLab URL is accessible from runner container
-5. Check SSL certificate is mounted: `docker exec gitlab-runner-docker ls /certs`
+2. Verify runner token is correct:
+   ```bash
+   sudo cat /home/gitlab-runner/.gitlab-runner/config.toml
+   ```
+3. Check network connectivity:
+   ```bash
+   sudo -u gitlab-runner curl -I https://gitlab.local
+   ```
+4. Ensure SSL certificate is installed system-wide:
+   ```bash
+   sudo update-ca-certificates --verbose | grep gitlab.local
+   ```
+5. Check gitlab-runner user permissions:
+   ```bash
+   groups gitlab-runner
+   # Should include: docker, kvm, libvirt
+   ```
+6. Restart the runner service:
+   ```bash
+   sudo systemctl restart gitlab-runner
+   ```
 
 ### Android Emulator Fails to Start
 
@@ -508,8 +678,11 @@ Flutter Docker image definition based on `ghcr.io/cirruslabs/flutter:3.22.0`.
 2. **Traefik Dashboard**: http://localhost:8080 (disable in production)
 3. **Runner Logs**:
    ```bash
-   docker logs -f gitlab-runner-docker
-   docker logs -f gitlab-runner-shell
+   # System service runner logs
+   sudo journalctl -u gitlab-runner -f
+
+   # View recent job logs
+   sudo tail -f /home/gitlab-runner/ci-cd/working/builds/*/*/.gitlab-ci-trace.log
    ```
 
 ### Scaling
@@ -540,11 +713,24 @@ docker compose -f docker-compose_gitlab.yml pull gitlab
 docker compose -f docker-compose_gitlab.yml up -d gitlab
 ```
 
-### Update Runners
+### Update GitLab Runner
 
 ```bash
-docker compose -f docker-compose_gitlab.yml pull gitlab-runner-docker gitlab-runner-shell
-docker compose -f docker-compose_gitlab.yml up -d gitlab-runner-docker gitlab-runner-shell
+# Stop the runner service
+sudo gitlab-runner stop
+
+# Download latest version
+curl -L --output /tmp/gitlab-runner "https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64"
+
+# Replace the binary
+sudo mv /tmp/gitlab-runner /usr/local/bin/gitlab-runner
+sudo chmod +x /usr/local/bin/gitlab-runner
+
+# Start the runner service
+sudo gitlab-runner start
+
+# Verify version
+gitlab-runner --version
 ```
 
 ### Clean Up Old Build Artifacts
