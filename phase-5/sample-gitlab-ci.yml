@@ -1,0 +1,60 @@
+# MUST define stages
+stages:
+  - check
+  - build
+
+# Global variables
+variables:
+  # CI: "true"
+  # TERM: "dumb"
+  # DEBIAN_FRONTEND: "noninteractive"
+  # FLUTTER_SUPPRESS_ANALYTICS: "true"
+  # PUB_ENVIRONMENT: "ci"
+
+# Job without tags (uses any available runner)
+check-runner:
+  stage: check
+  script:
+    - echo "✅ Pipeline is running!"
+    - echo "Runner = $CI_RUNNER_DESCRIPTION"
+    - echo "Tags = $CI_RUNNER_TAGS"
+    - echo "User = $(whoami)"
+    - echo "Directory = $(pwd)"
+  tags:
+    - host-runner
+
+# Check Flutter availability
+check-flutter:
+  stage: check
+  script:
+    - echo "Checking Flutter installation..."
+    - |
+      if [ -f /usr/bin/flutter.sh ]; then
+        echo "Found Flutter wrapper script"
+        /usr/bin/flutter.sh doctor -v
+      else
+        echo "❌ Flutter not found!"
+        exit 1
+      fi
+  tags:
+    - host-runner
+  allow_failure: true
+
+# Build APK
+build-android:
+  stage: build
+  script:
+    - echo "Building Android APK..."
+    - cd $CI_PROJECT_DIR
+    - /usr/bin/flutter.sh pub get
+    - /usr/bin/flutter.sh build apk -v
+  artifacts:
+    paths:
+      - build/app/outputs/flutter-apk/app-release.apk
+  tags:
+    - host-runner
+  only:
+    - main
+    - master
+    - develop
+
