@@ -16,34 +16,34 @@ This repository provides a step-by-step guide to set up a self-hosted CI/CD pipe
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Developer Workstation                     │
-│                  (Push code to GitLab)                       │
+│                    Developer Workstation                    │
+│                  (Push code to GitLab)                      │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Traefik Reverse Proxy                     │
-│              (HTTPS:443 → HTTP:80 internal)                  │
-│              SSL Termination & Routing                       │
+│                    Traefik Reverse Proxy                    │
+│              (HTTPS:443 → HTTP:80 internal)                 │
+│              SSL Termination & Routing                      │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      GitLab CE Server                        │
-│                   (https://gitlab.local)                     │
-│              - Source Code Management                        │
-│              - CI/CD Pipeline Orchestration                  │
-│              - Web Interface & API                           │
+│                      GitLab CE Server                       │
+│                   (https://gitlab.local)                    │
+│              - Source Code Management                       │
+│              - CI/CD Pipeline Orchestration                 │
+│              - Web Interface & API                          │
 └────────────────┬───────────────────────┬────────────────────┘
                  │                       │
-        ┌────────▼────────┐     ┌───────▼─────────┐
-        │  GitLab Runner  │     │  GitLab Runner  │
+        ┌────────▼─────────┐     ┌───────▼─────────┐
+        │  GitLab Runner   │     │  GitLab Runner  │
         │ (Docker Executor)│     │ (Shell Executor)│
-        │                 │     │  + KVM Support  │
-        │ - Build APKs    │     │ - Integration   │
-        │ - Run Tests     │     │   Tests         │
-        │ - Deploy        │     │ - Emulator      │
-        └─────────────────┘     └─────────────────┘
+        │                  │     │  + KVM Support  │
+        │ - Build APKs     │     │ - Integration   │
+        │ - Run Tests      │     │   Tests         │
+        │ - Deploy         │     │ - Emulator      │
+        └──────────────────┘     └─────────────────┘
 ```
 
 ## Prerequisites
@@ -61,8 +61,11 @@ This repository provides a step-by-step guide to set up a self-hosted CI/CD pipe
 - Docker Engine 20.10+
 - Docker Compose v2
 - Internet connection for initial setup
+- In Linux server, create the 1st user named gitlab-runner with id 1000 (for matching to user ubuntu in flutter image) and sudo previliege.
 
 ## Installation Guide
+
+NOTE: execute the following steps as the user gitlab-runner 
 
 ### Phase 1: Host Preparation
 
@@ -82,7 +85,7 @@ This script will:
 - Install Docker and Docker Compose
 - Install KVM and virtualization tools
 - Install Android development tools (OpenJDK, ADB)
-- Add your user to docker, kvm, and libvirt groups
+- Add the gitlab-runner user to docker, kvm, and libvirt groups
 
 **Important**: After running this script, log out and log back in for group changes to take effect.
 
