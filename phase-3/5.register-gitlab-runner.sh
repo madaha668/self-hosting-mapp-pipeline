@@ -311,7 +311,7 @@ parse_arguments() {
         RUNNER_EXECUTOR="$2"; shift 2 ;;
       -i|--docker-image)
         DOCKER_IMAGE="$2"; shift 2 ;;
-      -v|--docker-volumes)
+      -V|--docker-volumes)
         DOCKER_VOLUMES="$2"; shift 2 ;;
       --docker-privileged)
         DOCKER_PRIVILEGED=true; shift ;;

@@ -5,12 +5,16 @@ stages:
   - release
 
 # Global variables
-variables:
+#variables:
   # CI: "true"
   # TERM: "dumb"
   # DEBIAN_FRONTEND: "noninteractive"
   # FLUTTER_SUPPRESS_ANALYTICS: "true"
   # PUB_ENVIRONMENT: "ci"
+  #
+variables:
+# GIT_CLONE_PATH: "http://gitlab/$CI_PROJECT_PATH.git"
+
 
 # Job without tags (uses any available runner)
 check-runner:
@@ -84,7 +88,6 @@ build-android:
 
 release_job:
   stage: release
-    #image: registry.gitlab.com/gitlab-org/release-cli:latest
   needs:
     - job: build-android
       artifacts: true
