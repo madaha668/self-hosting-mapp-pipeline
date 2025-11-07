@@ -2,6 +2,7 @@
 stages:
   - check
   - build
+  - release
 
 # Global variables
 variables:
@@ -15,11 +16,12 @@ variables:
 check-runner:
   stage: check
   script:
-    - echo "✅ Pipeline is running!"
-    - echo "Runner = $CI_RUNNER_DESCRIPTION"
-    - echo "Tags = $CI_RUNNER_TAGS"
-    - echo "User = $(whoami)"
-    - echo "Directory = $(pwd)"
+    - |
+      echo "✅ Pipeline is running!"
+      echo "Runner = $CI_RUNNER_DESCRIPTION"
+      echo "Tags = $CI_RUNNER_TAGS"
+      echo "User = $(whoami)"
+      echo "Directory = $(pwd)"
   tags:
     - host-runner
 
@@ -27,8 +29,8 @@ check-runner:
 check-flutter:
   stage: check
   script:
-    - echo "Checking Flutter installation..."
     - |
+      echo "Checking Flutter installation..."
       if [ -f /usr/bin/flutter.sh ]; then
         echo "Found Flutter wrapper script"
         /usr/bin/flutter.sh doctor -v
@@ -40,21 +42,67 @@ check-flutter:
     - host-runner
   allow_failure: true
 
+# Check HEAD git commit number
+check-commit-number:
+  stage: check
+  script:
+    - |
+      echo "Checking HEAD branch commit number ..."
+      echo "Commit ref: $CI_COMMIT_REF_NAME"
+      commit_number=$(git rev-parse HEAD)
+      echo $commit_number
+  tags:
+    - host-runner
+
 # Build APK
 build-android:
   stage: build
   script:
-    - echo "Building Android APK..."
-    - cd $CI_PROJECT_DIR
-    - /usr/bin/flutter.sh pub get
-    - /usr/bin/flutter.sh build apk -v
+    - |
+      echo "Building Android APK..."
+      cd $CI_PROJECT_DIR
+      /usr/bin/flutter.sh pub get
+      /usr/bin/flutter.sh build apk -v --release --target-platform=android-arm64,android-x64
+      mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-${CI_COMMIT_SHORT_SHA}.apk
+      find build -name "metadata*gz*" -type f| head -20
+      echo "CI_COMMIT_TAG: "${CI_COMMIT_TAG}
   artifacts:
     paths:
-      - build/app/outputs/flutter-apk/app-release.apk
+      - build/app/outputs/flutter-apk/app-${CI_COMMIT_SHORT_SHA}.apk
+    exclude:
+      - build/**/*.log
+      - build/**/*.gz
+      - build/**/metadata*
+    untracked: false
+    expire_in: 30 days
+    when: on_success
   tags:
     - host-runner
   only:
     - main
-    - master
     - develop
 
+release_job:
+  stage: release
+    #image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: build-android
+      artifacts: true
+  script:
+    - echo "Creating APK release for commit ${CI_COMMIT_SHA}"
+  release:
+    tag_name: v${CI_COMMIT_SHA}
+    name: "Release $CI_COMMIT_SHA"
+    description: "Flutter App Release"
+    assets:
+      links:
+        - name: "app-${CI_COMMIT_SHORT_SHA}.apk"
+          # Link to the BUILD job’s artifact using the ref (tag) and job name.
+          # This works even though the release job is a different job.
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/build/app/outputs/flutter-apk/app-${CI_COMMIT_SHORT_SHA}.apk"
+          link_type: "package"
+  allow_failure: true
+  tags:
+    - host-runner
+  only:
+    - main
