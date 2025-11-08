@@ -1,4 +1,5 @@
 # Update system and install essential tools
+echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y curl git wget unzip build-essential cpu-checker
 
