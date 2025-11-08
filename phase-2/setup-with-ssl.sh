@@ -33,7 +33,17 @@ echo ""
 # 2. Run the start script
 bash ./start.sh
 
+# 3. Deploy the SSL certificate
 echo ""
+echo "=========================================="
+echo "Deploy the Self-Signed Certificate"
+echo "=========================================="
+echo ""
+sudo mkdir -p /etc/gitlab-runner
+sudo cp -rf ./certs /etc/gitlab-runner
+sudo cp ./certs/gitlab.local.crt /usr/local/share/ca-certificates/
+sudo sudo update-ca-certificates
+
 echo "=========================================="
 echo "Setup Complete!"
 echo "=========================================="
@@ -48,3 +58,6 @@ echo "3. You can safely proceed past the warning (it's expected for self-signed 
 echo ""
 echo "To stop services: bash ./stop.sh"
 echo ""
+
+
+
