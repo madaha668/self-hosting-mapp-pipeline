@@ -41,7 +41,7 @@ services:
       - "--accesslog=true"
     ports:
       - "80:80"
-      - "443:443"
+      - "50443:443"
       - "8080:8080"  # Traefik dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -73,7 +73,7 @@ services:
       - .env
     environment:
       GITLAB_OMNIBUS_CONFIG: |
-        external_url 'https://gitlab.local'
+        external_url 'https://gitlab.local:50443'
         nginx['listen_port'] = 80
         nginx['listen_https'] = false
         nginx['proxy_set_headers'] = {

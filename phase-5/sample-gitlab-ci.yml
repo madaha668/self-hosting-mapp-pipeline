@@ -67,7 +67,7 @@ build-android:
       GRADLE_WRARPPER_PROPERTY_FILE=android/gradle/wrapper/gradle-wrapper.properties
       if [ -f $GRADLE_WRARPPER_PROPERTY_FILE ]; then
         cat $GRADLE_WRARPPER_PROPERTY_FILE 
-        sed -i 's|https\\://services\.gradle\.org/distributions/\(gradle-.*-all\.zip\)|https://mirrors.cloud.tencent.com/gradle/\1|' gradle-wrapper.properties
+        sed -i 's|https\\://services\.gradle\.org/distributions/\(gradle-.*-all\.zip\)|https://mirrors.cloud.tencent.com/gradle/\1|' $GRADLE_WRARPPER_PROPERTY_FILE 
         cat $GRADLE_WRARPPER_PROPERTY_FILE 
         echo "Using tencent mirror to avoid potential network issue ..."
       else
