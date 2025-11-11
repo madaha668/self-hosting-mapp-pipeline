@@ -41,7 +41,7 @@ services:
       - "--accesslog=true"
     ports:
       - "80:80"
-      - "50443:443"
+      - "443:443"
       - "8080:8080"  # Traefik dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -60,6 +60,35 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  blackhole-404:
+    image: nginx:alpine
+    command: >
+      sh -c "printf 'events{}\\nhttp{server{listen 8080;
+      location / { return 404; }}}' > /etc/nginx/nginx.conf
+      && exec nginx -g \"daemon off;\""
+    expose:
+      - "8080"
+    labels:
+      - "traefik.enable=true"
+
+      # HTTPS: match /users/signup OR /users/sign_up on ANY host/IP
+
+      - 'traefik.http.routers.block-signup.rule=Host(`gitlab.local`) && Path(`/users/signup`)'
+      - "traefik.http.routers.block-signup.entrypoints=websecure"
+      - "traefik.http.routers.block-signup.priority=999999"
+      - "traefik.http.routers.block-signup.tls=true"
+      - "traefik.http.routers.block-signup.service=blackhole-404@docker"
+      - 'traefik.http.routers.block-sign-up.rule=Host(`gitlab.local`) && Path(`/users/sign_up`)'
+      - "traefik.http.routers.block-sign-up.entrypoints=websecure"
+      - "traefik.http.routers.block-sign-up.priority=999999"
+      - "traefik.http.routers.block-sign-up.tls=true"
+      - "traefik.http.routers.block-sign-up.service=blackhole-404@docker"
+
+      # Service definition for this container (nginx listens on 8080)
+      - "traefik.http.services.blackhole-404.loadbalancer.server.port=8080"
+    networks:
+      - cicd-network
+
   gitlab:
     image: gitlab/gitlab-ce:18.3.5-ce.0
     container_name: gitlab
@@ -73,7 +102,7 @@ services:
       - .env
     environment:
       GITLAB_OMNIBUS_CONFIG: |
-        external_url 'https://gitlab.local:50443'
+        external_url 'https://gitlab.local'
         nginx['listen_port'] = 80
         nginx['listen_https'] = false
         nginx['proxy_set_headers'] = {

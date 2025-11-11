@@ -26,8 +26,11 @@ done
 echo "✅ GitLab is healthy"
 
 # 5. Start runners
-echo "Starting GitLab runners..."
-docker compose up -d gitlab-runner-docker gitlab-runner-shell
+#echo "Starting GitLab runners..."
+#docker compose up -d gitlab-runner-docker gitlab-runner-shell
+# 5. Start blackhole-404 to disable self signup
+echo "Starting Blackhole-404 ..."
+docker compose up -d blackhole-404
 
 # 6. Verify all containers are running
 sleep 30
