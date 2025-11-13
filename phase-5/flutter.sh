@@ -9,7 +9,7 @@ fi
 if [ -f ${PWD}/../.sh-env ]; then
   source ../.sh-env
 else
-  WORKFLOW_HOME=${HOME}/oldhome/
+  WORKFLOW_HOME=${HOME}
 fi
 
 #FIXME: set yours !!!
