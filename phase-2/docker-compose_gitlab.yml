@@ -62,6 +62,7 @@ services:
 
   blackhole-404:
     image: nginx:alpine
+    restart: unless-stopped
     command: >
       sh -c "printf 'events{}\\nhttp{server{listen 8080;
       location / { return 404; }}}' > /etc/nginx/nginx.conf
