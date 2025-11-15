@@ -26,4 +26,12 @@ RUN chown -R ${USER_ID}:${GROUP_ID} /sdks/flutter
 
 RUN apt-get update && apt-get install -y iputils-ping
 
-RUN flutter config --no-analytics
+
+# forcedly enable web in the configuration
+
+USER ubuntu
+RUN flutter config --no-analytics 
+RUN flutter config --enable-web
+RUN flutter precache
+
+USER ubuntu
