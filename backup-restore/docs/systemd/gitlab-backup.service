@@ -1,0 +1,16 @@
+[Unit]
+Description=GitLab Backup Service
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/gitlab-backup-docker
+ExecStart=/usr/bin/docker-compose run --rm gitlab-backup
+StandardOutput=journal
+StandardError=journal
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # Backup service - run on-demand or via cron
+  gitlab-backup:
+    build: .
+    container_name: gitlab-backup
+    volumes:
+      # Docker control (required)
+      - /var/run/docker.sock:/var/run/docker.sock
+      
+      # GitLab directories (read-only)
+      - /srv/gitlab/backups:/gitlab/backups:ro
+      - /srv/gitlab/config:/gitlab/config:ro
+      
+      # Optional GitLab directories
+      - /srv/gitlab/ssl:/gitlab/ssl:ro
+      - /srv/gitlab-runner:/gitlab-runner:ro
+      
+      # Backup system directories
+      - ./backups:/backups
+      - ./config:/config
+      - ./logs:/logs
+      
+      # SSH keys for remote sync (optional)
+      - ~/.ssh:/root/.ssh:ro
+    environment:
+      - TZ=Asia/Shanghai
+    command: ["/app/scripts/backup.sh"]
+    restart: "no"
+    networks:
+      - gitlab-backup-net
+
+  # Restore service - run on-demand only
+  gitlab-restore:
+    build: .
+    container_name: gitlab-restore
+    volumes:
+      # Docker control (required)
+      - /var/run/docker.sock:/var/run/docker.sock
+      
+      # Backup system directories
+      - ./backups:/backups
+      - ./config:/config
+      - ./logs:/logs
+    environment:
+      - TZ=Asia/Shanghai
+    entrypoint: ["/app/scripts/restore.sh"]
+    restart: "no"
+    networks:
+      - gitlab-backup-net
+
+networks:
+  gitlab-backup-net:
+    driver: bridge

@@ -1,0 +1,101 @@
+# GitLab Backup Configuration
+# 请复制此文件为 backup.conf 并根据实际情况修改
+
+# ============================================
+# 必需配置
+# ============================================
+
+# GitLab 容器名称（必需）
+GITLAB_CONTAINER_NAME=gitlab
+
+# ============================================
+# 备份保留策略
+# ============================================
+
+# 本地备份保留天数（默认 14 天）
+RETENTION_DAYS=14
+
+# 远程备份保留天数（仅在启用远程备份时生效）
+REMOTE_RETENTION_DAYS=90
+
+# ============================================
+# 通知配置
+# ============================================
+
+# 是否启用飞书通知（true/false）
+ENABLE_FEISHU_NOTIFY=true
+
+# 飞书 Webhook URL（如果启用通知则必需）
+# 获取方式：飞书群组 -> 设置 -> 群机器人 -> 添加机器人 -> 自定义机器人
+FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+# ============================================
+# 远程备份配置（可选）
+# ============================================
+
+# 是否启用远程备份（true/false）
+REMOTE_BACKUP_ENABLED=false
+
+# 远程服务器地址（SSH 格式）
+# 格式：user@host:/path/to/backup
+# 示例：backup@backup.example.com:/data/backups/gitlab
+REMOTE_SERVER=user@backup.example.com:/backups/gitlab
+
+# SSH 私钥路径（用于远程连接）
+# 确保此密钥已添加到远程服务器的 authorized_keys
+REMOTE_SSH_KEY=/root/.ssh/id_rsa
+
+# ============================================
+# 高级选项
+# ============================================
+
+# 是否跳过 artifacts（节省空间，推荐 true）
+# artifacts 通常很大且可以重新生成
+SKIP_ARTIFACTS=true
+
+# 是否启用额外压缩（可能增加 CPU 使用但节省空间）
+ENABLE_COMPRESSION=false
+
+# 最大并发备份数（建议保持为 1）
+MAX_CONCURRENT_BACKUPS=1
+
+# ============================================
+# 邮件通知配置（可选，未实现）
+# ============================================
+
+# 是否启用邮件通知
+# ENABLE_EMAIL_NOTIFY=false
+
+# 邮件接收地址
+# EMAIL_TO=admin@example.com
+
+# SMTP 服务器配置
+# SMTP_SERVER=smtp.example.com
+# SMTP_PORT=587
+# SMTP_USER=noreply@example.com
+# SMTP_PASSWORD=your_password
+
+# ============================================
+# 配置说明
+# ============================================
+
+# 1. 基本使用
+#    - 最少只需配置 GITLAB_CONTAINER_NAME
+#    - 其他选项使用默认值即可
+#
+# 2. 推荐配置
+#    - 启用飞书通知，及时了解备份状态
+#    - 设置合理的保留天数（14-30 天）
+#    - 生产环境建议启用远程备份
+#
+# 3. SSH 密钥配置（用于远程备份）
+#    在宿主机上执行：
+#      ssh-keygen -t rsa -b 4096 -f ~/.ssh/gitlab_backup_rsa
+#      ssh-copy-id -i ~/.ssh/gitlab_backup_rsa.pub user@backup-server
+#
+# 4. 测试配置
+#    修改配置后，运行测试备份：
+#      docker-compose run --rm gitlab-backup
+#
+# 5. 查看备份状态
+#      docker-compose run --rm gitlab-backup /app/scripts/check-status.sh

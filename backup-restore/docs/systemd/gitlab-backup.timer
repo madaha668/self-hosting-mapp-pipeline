@@ -1,0 +1,17 @@
+[Unit]
+Description=GitLab Backup Timer
+Requires=gitlab-backup.service
+
+[Timer]
+# 每天凌晨 2 点执行
+OnCalendar=daily
+OnCalendar=02:00
+
+# 如果错过了执行时间，启动后立即执行
+Persistent=true
+
+# 随机延迟（避免所有任务同时执行）
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target
