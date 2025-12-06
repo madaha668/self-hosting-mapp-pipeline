@@ -14,6 +14,16 @@
 - ✅ **状态监控**：实时查看备份状态
 - ✅ **指标导出**：Prometheus 格式指标
 
+## 🐳 Docker Compose 兼容性
+
+本项目使用现代 `docker compose` (V2) 语法，同时完全兼容旧版 `docker-compose` (V1)：
+
+- ✅ **推荐**: `docker compose` (V2 Plugin) - 性能更好，官方推荐
+- ✅ **兼容**: `docker-compose` (V1 Standalone) - 向后兼容支持
+- 🔄 **自动检测**: 所有脚本自动检测并使用可用版本
+
+**详细说明**: 查看 [DOCKER-COMPOSE.md](DOCKER-COMPOSE.md) | **快速升级**: `sudo apt-get install docker-compose-plugin`
+
 ## 🏗️ 架构
 
 ```
@@ -49,16 +59,31 @@
 ```
 gitlab-backup-docker/
 ├── Dockerfile                      # 备份容器镜像
-├── docker-compose.yml              # 服务编排
+├── docker-compose.yml              # 生产环境配置
+├── docker-compose.test.yml         # 🧪 测试环境配置
 ├── README.md                       # 本文件
+├── QUICKSTART.md                   # 快速开始指南
+├── TESTING.md                      # 🧪 测试指南（推荐阅读）
+├── CHANGELOG.md                    # 更新日志
 │
-├── scripts/                        # 脚本目录
+├── 🔧 工具脚本
+│   ├── install.sh                  # 安装向导
+│   ├── preflight-check.sh          # 🧪 预检测脚本
+│   ├── test-backup.sh              # 🧪 测试脚本（支持 dry-run）
+│   └── diagnose-gitlab.sh          # 🔍 GitLab 容器诊断工具
+│
+├── scripts/                        # 核心脚本目录
 │   ├── backup.sh                   # 备份脚本
 │   ├── restore.sh                  # 恢复脚本
 │   └── check-status.sh             # 状态检查脚本
 │
 ├── config/                         # 配置目录
 │   └── backup.conf.example         # 配置模板
+│
+├── docs/                           # 文档和示例
+│   └── systemd/                    # systemd 配置示例
+│       ├── gitlab-backup.service
+│       └── gitlab-backup.timer
 │
 ├── backups/                        # 备份输出目录（自动创建）
 │   └── full/
@@ -74,6 +99,32 @@ gitlab-backup-docker/
     ├── backup-20241203_020000.log
     └── restore-20241203_080000.log
 ```
+
+## 🧪 测试功能（推荐先测试）
+
+**在生产环境安装前，建议先测试功能！**
+
+### 快速测试（2 分钟）
+
+```bash
+# 1. 预检测环境
+./preflight-check.sh
+
+# 2. 模拟运行（不执行实际操作）
+./test-backup.sh --dry-run
+```
+
+### 完整测试（15 分钟）
+
+```bash
+# 使用独立测试环境完整测试所有功能
+# 详见 TESTING.md
+docker compose -f docker-compose.test.yml up -d gitlab-test
+```
+
+**📖 完整测试指南**: 查看 [TESTING.md](TESTING.md)
+
+---
 
 ## 🚀 快速开始
 
@@ -99,7 +150,51 @@ tar -xzf gitlab-backup-docker.tar.gz
 # cd gitlab-backup-docker
 ```
 
-### 3. 配置
+### 3. 自动配置（推荐）⭐
+
+**零配置方式** - 自动检测 GitLab 容器并配置所有路径：
+
+```bash
+# 一键自动配置
+./auto-configure.sh
+
+# 它会:
+# ✓ 自动找到 GitLab 容器
+# ✓ 检测所有挂载点
+# ✓ 自动生成 docker-compose.yml
+# ✓ 自动创建 config/backup.conf
+# ✓ 无需手动编辑任何配置
+```
+
+**输出示例**:
+```
+========================================
+  GitLab Backup - 自动配置
+========================================
+
+1. 查找 GitLab 容器...
+✓ 找到容器: gitlab
+
+2. 检查容器挂载...
+
+检测挂载点:
+  ✓ 备份目录: /var/lib/docker/volumes/gitlab_backups/_data
+  ✓ 配置目录: /opt/gitlab/config
+
+3. 生成配置...
+✓ docker-compose.yml 已更新
+✓ config/backup.conf 已创建
+
+========================================
+✓ 自动配置完成！
+========================================
+```
+
+### 4. 配置（手动方式 - 如果自动配置不可用）
+
+### 4. 配置（手动方式 - 如果自动配置不可用）
+
+仅在 `auto-configure.sh` 无法运行时需要：
 
 ```bash
 # 复制配置模板
@@ -121,9 +216,11 @@ ENABLE_FEISHU_NOTIFY=false
 REMOTE_BACKUP_ENABLED=false
 ```
 
-### 4. 验证 GitLab 路径
+### 5. 验证 GitLab 路径（手动配置时）
 
-确保 `docker-compose.yml` 中的路径与你的 GitLab 安装一致：
+**⚠️ 使用 `auto-configure.sh` 则跳过此步骤！**
+
+仅在手动配置时需要确保 `docker-compose.yml` 中的路径与你的 GitLab 安装一致：
 
 ```bash
 # 检查 GitLab 数据目录
@@ -135,17 +232,17 @@ docker inspect gitlab | grep -A 10 Mounts
 #   - /srv/gitlab/config:/gitlab/config:ro
 ```
 
-### 5. 构建镜像
+### 6. 构建镜像
 
 ```bash
-docker-compose build
+docker compose build
 ```
 
-### 6. 测试备份
+### 7. 测试备份
 
 ```bash
 # 手动执行一次备份
-docker-compose run --rm gitlab-backup
+docker compose run --rm gitlab-backup
 
 # 查看日志
 tail -f logs/backup-*.log
@@ -154,7 +251,7 @@ tail -f logs/backup-*.log
 ls -lh backups/full/
 ```
 
-### 7. 设置定时任务
+### 8. 设置定时任务
 
 **方法 1：宿主机 crontab**
 
@@ -163,7 +260,7 @@ ls -lh backups/full/
 crontab -e
 
 # 添加定时任务（每天凌晨 2 点）
-0 2 * * * cd /opt/gitlab-backup-docker && docker-compose run --rm gitlab-backup >> /var/log/gitlab-backup-cron.log 2>&1
+0 2 * * * cd /opt/gitlab-backup-docker && docker compose run --rm gitlab-backup >> /var/log/gitlab-backup-cron.log 2>&1
 ```
 
 **方法 2：systemd timer（推荐）**
@@ -179,7 +276,7 @@ Requires=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/gitlab-backup-docker
-ExecStart=/usr/bin/docker-compose run --rm gitlab-backup
+ExecStart=/usr/bin/docker compose run --rm gitlab-backup
 StandardOutput=journal
 StandardError=journal
 
@@ -218,7 +315,7 @@ systemctl status gitlab-backup.timer
 
 ```bash
 # 手动备份
-docker-compose run --rm gitlab-backup
+docker compose run --rm gitlab-backup
 
 # 查看备份列表
 ls -lht backups/full/
@@ -227,20 +324,20 @@ ls -lht backups/full/
 ls -lh backups/full/$(ls -t backups/full/ | head -1)
 
 # 查看备份状态
-docker-compose run --rm gitlab-backup /app/scripts/check-status.sh
+docker compose run --rm gitlab-backup /app/scripts/check-status.sh
 ```
 
 ### 恢复操作
 
 ```bash
 # 列出可用备份
-docker-compose run --rm gitlab-restore /backups/full/
+docker compose run --rm gitlab-restore /backups/full/
 
 # 恢复指定备份（会有交互确认）
-docker-compose run --rm gitlab-restore /backups/full/20241203_020000
+docker compose run --rm gitlab-restore /backups/full/20241203_020000
 
 # 非交互恢复（自动确认）
-echo "yes" | docker-compose run --rm gitlab-restore /backups/full/20241203_020000
+echo "yes" | docker compose run --rm gitlab-restore /backups/full/20241203_020000
 ```
 
 **⚠️ 恢复注意事项**：
@@ -254,7 +351,7 @@ echo "yes" | docker-compose run --rm gitlab-restore /backups/full/20241203_02000
 
 ```bash
 # 查看系统状态
-docker-compose run --rm gitlab-backup /app/scripts/check-status.sh
+docker compose run --rm gitlab-backup /app/scripts/check-status.sh
 
 # 或者直接在宿主机执行
 ./scripts/check-status.sh
@@ -384,6 +481,43 @@ tail -f logs/backup-*.log
 
 ## 🐛 故障排查
 
+### 预检测失败问题
+
+**问题：预检测显示"未找到 GitLab 数据目录"**
+
+这是**正常的**，特别是使用 Docker 命名卷时。原因：
+- Docker 命名卷不是普通目录
+- 自定义挂载路径
+- 备份通过容器内部执行，不需要宿主机直接访问
+
+**解决方法**：
+
+```bash
+# 1. 运行诊断工具（推荐）
+./diagnose-gitlab.sh
+
+# 2. 手动检查容器挂载
+docker inspect gitlab | grep -A 10 Mounts
+
+# 3. 查看实际挂载路径
+docker inspect gitlab | grep -B3 "/var/opt/gitlab/backups"
+```
+
+诊断工具会显示：
+- ✓ 所有挂载点的实际路径
+- ✓ 推荐的 docker-compose.yml 配置
+- ✓ 现有备份文件列表
+
+**更新 docker-compose.yml**：
+
+根据诊断结果，更新挂载路径：
+```yaml
+volumes:
+  # 使用诊断工具显示的实际路径
+  - /your/actual/path/backups:/gitlab/backups:ro
+  - /your/actual/path/config:/gitlab/config:ro
+```
+
 ### 备份失败
 
 **问题：找不到 GitLab 容器**
@@ -509,10 +643,10 @@ git pull  # 或下载新版本
 diff config/backup.conf.bak config/backup.conf.example
 
 # 重新构建镜像
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # 测试
-docker-compose run --rm gitlab-backup
+docker compose run --rm gitlab-backup
 ```
 
 ## 📝 变更日志

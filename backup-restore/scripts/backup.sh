@@ -128,7 +128,7 @@ log "备份文件已保存: $BACKUP_DEST"
 # Step 3: Verify backup integrity
 log "步骤 3/7: 验证备份完整性..."
 
-if ! tar -tzf "$BACKUP_DEST" >/dev/null 2>&1; then
+if ! tar -tf "$BACKUP_DEST" >/dev/null 2>&1; then
   log "❌ 备份文件损坏，无法解压"
   send_feishu "失败" "备份文件完整性验证失败"
   exit 1

@@ -33,18 +33,66 @@ echo -e "${GREEN}✓ Docker 已安装${NC}"
 
 # Check Docker Compose
 echo "检查 Docker Compose..."
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+DOCKER_COMPOSE_CMD=""
+if docker compose version &> /dev/null 2>&1; then
+    DOCKER_COMPOSE_CMD="docker compose"
+    echo -e "${GREEN}✓ Docker Compose (plugin) 已安装${NC}"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+    echo -e "${GREEN}✓ docker-compose (standalone) 已安装${NC}"
+    echo -e "${YELLOW}ℹ 建议升级到 Docker Compose V2 (plugin)${NC}"
+else
     echo -e "${RED}✗ Docker Compose 未安装${NC}"
     echo "请先安装 Docker Compose"
     exit 1
 fi
-echo -e "${GREEN}✓ Docker Compose 已安装${NC}"
 echo ""
 
 # Get GitLab container name
 echo "配置向导"
 echo "========================================="
 echo ""
+
+# Offer auto-configuration
+echo -e "${GREEN}推荐: 自动配置${NC}"
+echo "自动检测 GitLab 容器并配置所有路径"
+echo ""
+read -p "是否使用自动配置? (y/n) [y]: " -n 1 -r
+echo
+echo
+
+if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+    # Run auto-configure
+    if [[ -f "./auto-configure.sh" ]]; then
+        ./auto-configure.sh
+        
+        if [[ $? -eq 0 ]]; then
+            echo ""
+            echo -e "${GREEN}✓ 自动配置成功完成${NC}"
+            echo ""
+            
+            # Skip to build step
+            AUTO_CONFIGURED=true
+        else
+            echo ""
+            echo -e "${YELLOW}自动配置失败，切换到手动配置${NC}"
+            echo ""
+            AUTO_CONFIGURED=false
+        fi
+    else
+        echo -e "${YELLOW}未找到 auto-configure.sh，使用手动配置${NC}"
+        echo ""
+        AUTO_CONFIGURED=false
+    fi
+else
+    AUTO_CONFIGURED=false
+fi
+
+if [[ "$AUTO_CONFIGURED" != "true" ]]; then
+    # Manual configuration
+    echo "手动配置模式"
+    echo "-------------------"
+    echo ""
 
 # List running containers
 echo "当前运行的容器："
@@ -129,13 +177,17 @@ else
     REMOTE_RETENTION=""
 fi
 
+    # End of manual configuration
+fi  # End AUTO_CONFIGURED check
+
 # Create directories
 echo ""
 echo "创建目录结构..."
 mkdir -p backups/full logs config
 echo -e "${GREEN}✓ 目录已创建${NC}"
 
-# Generate configuration
+# Generate configuration (skip if auto-configured)
+if [[ "$AUTO_CONFIGURED" != "true" ]]; then
 echo ""
 echo "生成配置文件..."
 cat > config/backup.conf <<EOF
@@ -165,8 +217,10 @@ MAX_CONCURRENT_BACKUPS=1
 EOF
 
 echo -e "${GREEN}✓ 配置文件已生成: config/backup.conf${NC}"
+fi  # End of config generation
 
-# Update docker-compose.yml paths if needed
+# Update docker-compose.yml paths if needed (skip if auto-configured)
+if [[ "$AUTO_CONFIGURED" != "true" ]]; then
 if [[ "$GITLAB_BACKUP_DIR_CONFIRMED" != "/srv/gitlab/backups" ]] || [[ "$GITLAB_CONFIG_DIR" != "/srv/gitlab/config" ]]; then
     echo ""
     echo "更新 docker-compose.yml 路径..."
@@ -174,6 +228,7 @@ if [[ "$GITLAB_BACKUP_DIR_CONFIRMED" != "/srv/gitlab/backups" ]] || [[ "$GITLAB_
     sed -i.bak "s|/srv/gitlab/config|$GITLAB_CONFIG_DIR|g" docker-compose.yml
     echo -e "${GREEN}✓ docker-compose.yml 已更新${NC}"
 fi
+fi  # End of docker-compose.yml update
 
 # Build image
 echo ""
@@ -181,7 +236,7 @@ read -p "是否立即构建 Docker 镜像? (y/n) [y]: " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     echo "构建镜像..."
-    docker-compose build
+    $DOCKER_COMPOSE_CMD build
     echo -e "${GREEN}✓ 镜像构建完成${NC}"
 fi
 
@@ -193,7 +248,7 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     echo ""
     echo "执行测试备份..."
     echo "========================================="
-    docker-compose run --rm gitlab-backup
+    $DOCKER_COMPOSE_CMD run --rm gitlab-backup
     echo "========================================="
     echo ""
     echo -e "${GREEN}✓ 测试备份完成${NC}"
@@ -216,7 +271,7 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     
     if [[ "$CRON_TYPE" == "1" ]]; then
         # crontab
-        CRON_CMD="0 2 * * * cd $(pwd) && docker-compose run --rm gitlab-backup >> /var/log/gitlab-backup-cron.log 2>&1"
+        CRON_CMD="0 2 * * * cd $(pwd) && $DOCKER_COMPOSE_CMD run --rm gitlab-backup >> /var/log/gitlab-backup-cron.log 2>&1"
         echo ""
         echo "请手动添加以下行到 crontab:"
         echo ""
@@ -242,7 +297,7 @@ Requires=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=$(pwd)
-ExecStart=/usr/bin/docker-compose run --rm gitlab-backup
+ExecStart=$(which docker) compose run --rm gitlab-backup
 StandardOutput=journal
 StandardError=journal
 

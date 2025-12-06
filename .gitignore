@@ -4,3 +4,35 @@ get-docker.sh
 certs/
 bin/
 *.log
+# Backup outputs
+backups/*
+!backups/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Configuration (contains sensitive data)
+config/backup.conf
+
+# Docker
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
+*.old
+
+# Metrics
+metrics.prom

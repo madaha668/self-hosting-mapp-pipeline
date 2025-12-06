@@ -23,7 +23,7 @@ REMOTE_RETENTION_DAYS=90
 # ============================================
 
 # 是否启用飞书通知（true/false）
-ENABLE_FEISHU_NOTIFY=true
+ENABLE_FEISHU_NOTIFY=false
 
 # 飞书 Webhook URL（如果启用通知则必需）
 # 获取方式：飞书群组 -> 设置 -> 群机器人 -> 添加机器人 -> 自定义机器人

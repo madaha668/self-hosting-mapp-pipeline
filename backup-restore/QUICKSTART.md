@@ -1,5 +1,19 @@
 # GitLab Backup 快速开始指南
 
+## 🧪 测试优先（推荐）
+
+**⚠️ 建议：在生产环境安装前，先测试功能！**
+
+```bash
+# 快速测试（2 分钟）
+./preflight-check.sh           # 检查环境
+./test-backup.sh --dry-run     # 模拟运行
+```
+
+**完整测试指南**: 查看 [TESTING.md](TESTING.md)
+
+---
+
 ## 🚀 5 分钟快速安装
 
 ### 1. 解压文件
@@ -10,7 +24,25 @@ tar -xzf gitlab-backup-docker.tar.gz
 cd gitlab-backup-docker
 ```
 
-### 2. 运行安装向导（推荐）
+### 2. 一键自动配置（推荐）⭐
+
+**最简单的方式 - 零配置！**
+
+```bash
+./auto-configure.sh
+```
+
+这个脚本会：
+- ✅ 自动找到您的 GitLab 容器
+- ✅ 自动检测所有挂载路径
+- ✅ 自动生成正确的配置文件
+- ✅ 无需手动编辑任何东西
+
+**就这么简单！配置完成后跳到步骤 3。**
+
+---
+
+### 2. 运行安装向导（备选方案）
 
 ```bash
 ./install.sh
@@ -36,10 +68,10 @@ cp config/backup.conf.example config/backup.conf
 vim config/backup.conf
 
 # 构建镜像
-docker-compose build
+docker compose build
 
 # 测试备份
-docker-compose run --rm gitlab-backup
+docker compose run --rm gitlab-backup
 ```
 
 ## 📋 基本使用
@@ -48,7 +80,7 @@ docker-compose run --rm gitlab-backup
 
 ```bash
 # 手动备份
-docker-compose run --rm gitlab-backup
+docker compose run --rm gitlab-backup
 
 # 查看备份
 ls -lht backups/full/
@@ -61,13 +93,13 @@ ls -lht backups/full/
 ls -lt backups/full/
 
 # 恢复指定备份
-docker-compose run --rm gitlab-restore /backups/full/20241203_020000
+docker compose run --rm gitlab-restore /backups/full/20241203_020000
 ```
 
 ### 状态检查
 
 ```bash
-docker-compose run --rm gitlab-backup /app/scripts/check-status.sh
+docker compose run --rm gitlab-backup /app/scripts/check-status.sh
 ```
 
 ## ⚙️ 最小配置示例
@@ -103,7 +135,7 @@ FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
 crontab -e
 
 # 添加：每天凌晨 2 点备份
-0 2 * * * cd /opt/gitlab-backup-docker && docker-compose run --rm gitlab-backup
+0 2 * * * cd /opt/gitlab-backup-docker && docker compose run --rm gitlab-backup
 ```
 
 ### 方法 2：systemd（推荐）
@@ -134,6 +166,18 @@ docker ps -a
 
 # 更新配置文件中的容器名
 vim config/backup.conf
+```
+
+### 找不到 GitLab 数据目录
+
+```bash
+# 运行诊断工具
+./diagnose-gitlab.sh
+
+# 它会显示:
+# - 容器的实际挂载路径
+# - 推荐的配置
+# - 需要更新的地方
 ```
 
 ### 路径不匹配
@@ -169,7 +213,7 @@ sudo chmod 755 /srv/gitlab/backups
 cat config/backup.conf
 
 # 2. 执行测试备份
-docker-compose run --rm gitlab-backup
+docker compose run --rm gitlab-backup
 
 # 3. 查看备份结果
 ls -lh backups/full/
@@ -178,7 +222,7 @@ ls -lh backups/full/
 tail -f logs/backup-*.log
 
 # 5. 检查系统状态
-docker-compose run --rm gitlab-backup /app/scripts/check-status.sh
+docker compose run --rm gitlab-backup /app/scripts/check-status.sh
 ```
 
 如果以上步骤都成功，说明安装正确！
