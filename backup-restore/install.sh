@@ -311,7 +311,6 @@ Description=GitLab Backup Timer
 Requires=gitlab-backup.service
 
 [Timer]
-OnCalendar=daily
 OnCalendar=02:00
 Persistent=true
 
